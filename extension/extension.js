@@ -31,6 +31,10 @@ const VitalsDBusInterface = `
     <method name="GetTextReadings">
       <arg type="a{s(ssss)}" direction="out"/>
     </method>
+    <method name="GetTimeSeries">
+      <arg type="s" name="key" direction="in"/>
+      <arg type="a(dd)" direction="out"/>
+    </method>
     <signal name="ReadingsChanged">
       <arg type="a{s(sdss)}"/>
     </signal>
@@ -63,6 +67,10 @@ const FORMAT_LABELS = {
     'hertz': ' Hz', 'memory': '', 'storage': '', 'speed': '/s',
     'load': '', 'watt': ' W', 'watt-gpu': ' W',
 };
+
+const GRAPH_BAR_COUNT = 60;
+const GRAPH_HEIGHT = 80;
+const GRAPH_BAR_WIDTH = 3;
 
 let vitalsMenu = null;
 
@@ -250,9 +258,10 @@ class VitalsMenuButton extends PanelMenu.Button {
         item.add_child(buttonBox);
         this.menu.addMenuItem(item);
 
-        // Refresh on menu open
+        // Refresh on menu open, hide graph on close
         this.menu.connect('open-state-changed', (_self, isOpen) => {
             if (isOpen) this._refresh();
+            else this._hideGraphPopout();
         });
     }
 
@@ -388,7 +397,7 @@ class VitalsMenuButton extends PanelMenu.Button {
             if (this._sensorMenuItems[key]) {
                 this._sensorMenuItems[key].value = value;
             } else {
-                this._appendMenuItem(key, label, value, category);
+                this._appendMenuItem(key, label, value, category, format);
             }
 
             // Update panel hot label
@@ -406,7 +415,7 @@ class VitalsMenuButton extends PanelMenu.Button {
         }
     }
 
-    _appendMenuItem(key, label, value, category) {
+    _appendMenuItem(key, label, value, category, format) {
         let group = this._groups[category];
         if (!group) return;
 
@@ -417,6 +426,13 @@ class VitalsMenuButton extends PanelMenu.Button {
 
         let isHot = this._hotLabels[key] !== undefined;
         let item = new VitalsMenuItem(gicon, key, label, value, isHot);
+
+        item.connect('notify::hover', () => {
+            if (item.hover)
+                this._showGraphPopout(item, key, format);
+            else
+                this._hideGraphPopout();
+        });
 
         item.connect('toggle', (self) => {
             let hotSensors = this._settings.get_strv('hot-sensors');
@@ -458,6 +474,196 @@ class VitalsMenuButton extends PanelMenu.Button {
         }
 
         this._sensorMenuItems[key] = item;
+    }
+
+    // ---------- History Graph Popout ----------
+
+    _showGraphPopout(menuItem, key, format) {
+        if (!this._settings.get_boolean('show-sensor-history-graph'))
+            return;
+        if (!this._proxy)
+            return;
+
+        this._hideGraphPopout();
+
+        this._proxy.GetTimeSeriesRemote(key, (result) => {
+            if (!result || !result[0] || result[0].length === 0)
+                return;
+
+            let points = result[0]; // array of [timestamp, value] pairs
+
+            // Downsample/bucket into GRAPH_BAR_COUNT bars
+            let values = points.map(p => p.deep_unpack ? p.deep_unpack() : p);
+            let rawVals = values.map(v => {
+                let inner = Array.isArray(v) ? v : [v[0], v[1]];
+                return inner[1];
+            });
+
+            // Apply format-specific scaling for display
+            rawVals = rawVals.map(v => {
+                switch (format) {
+                    case 'temp': return v / 1000;
+                    case 'in': return v / 1000;
+                    case 'watt': return v / 1000000;
+                    case 'percent': return v * 100;
+                    default: return v;
+                }
+            });
+
+            // Take last GRAPH_BAR_COUNT values, or pad front with zeros
+            let bars;
+            if (rawVals.length >= GRAPH_BAR_COUNT) {
+                bars = rawVals.slice(rawVals.length - GRAPH_BAR_COUNT);
+            } else {
+                bars = new Array(GRAPH_BAR_COUNT - rawVals.length).fill(0).concat(rawVals);
+            }
+
+            let min = Math.min(...bars.filter(v => v > 0));
+            let max = Math.max(...bars);
+            if (!isFinite(min)) min = 0;
+            if (!isFinite(max) || max === min) max = min + 1;
+
+            // Build the popout widget
+            let popout = new St.BoxLayout({
+                vertical: true,
+                style_class: 'vitals-history-popout',
+            });
+
+            // Title label
+            let title = new St.Label({
+                text: menuItem.label,
+                style_class: 'vitals-history-popout-label',
+            });
+            popout.add_child(title);
+
+            // Graph area: Y-axis + bars
+            let graphRow = new St.BoxLayout({
+                vertical: false,
+                style_class: 'vitals-history-graph-row',
+            });
+
+            // Y-axis labels
+            let yAxis = new St.BoxLayout({
+                vertical: true,
+                style_class: 'vitals-history-y-axis',
+                y_expand: true,
+            });
+            let maxLabel = new St.Label({
+                text: this._shortNum(max, format),
+                style_class: 'vitals-history-popout-axis',
+                y_align: Clutter.ActorAlign.START,
+            });
+            let minLabel = new St.Label({
+                text: this._shortNum(min, format),
+                style_class: 'vitals-history-popout-axis',
+                y_align: Clutter.ActorAlign.END,
+                y_expand: true,
+            });
+            yAxis.add_child(maxLabel);
+            yAxis.add_child(minLabel);
+            graphRow.add_child(yAxis);
+
+            // Bar container
+            let graphBox = new St.BoxLayout({
+                vertical: false,
+                style_class: 'vitals-history-graph',
+                y_expand: true,
+                clip_to_allocation: true,
+            });
+            let barsBox = new St.BoxLayout({
+                vertical: false,
+                style_class: 'vitals-history-graph-bars',
+                y_align: Clutter.ActorAlign.END,
+                y_expand: true,
+            });
+
+            for (let v of bars) {
+                let frac = (v - min) / (max - min);
+                if (!isFinite(frac) || frac < 0) frac = 0;
+                let h = Math.max(1, Math.round(frac * GRAPH_HEIGHT));
+                let bar = new St.Widget({
+                    style_class: 'vitals-history-graph-bar',
+                    width: GRAPH_BAR_WIDTH,
+                    height: h,
+                });
+                barsBox.add_child(bar);
+            }
+            graphBox.add_child(barsBox);
+            graphRow.add_child(graphBox);
+            popout.add_child(graphRow);
+
+            // X-axis labels (time range)
+            let xWrap = new St.BoxLayout({
+                vertical: false,
+                style_class: 'vitals-history-x-wrap',
+            });
+            let xSpacer = new St.Widget({ style_class: 'vitals-history-x-spacer' });
+            xWrap.add_child(xSpacer);
+
+            let xRow = new St.BoxLayout({
+                vertical: false,
+                style_class: 'vitals-history-x-row',
+                x_expand: true,
+            });
+            let duration = this._settings.get_int('sensor-history-duration');
+            let minsAgo = Math.round(duration / 60);
+            xRow.add_child(new St.Label({
+                text: minsAgo + 'm ago',
+                style_class: 'vitals-history-popout-axis',
+                x_align: Clutter.ActorAlign.START,
+            }));
+            xRow.add_child(new St.Label({
+                text: 'now',
+                style_class: 'vitals-history-popout-axis',
+                x_align: Clutter.ActorAlign.END,
+                x_expand: true,
+            }));
+            xWrap.add_child(xRow);
+            popout.add_child(xWrap);
+
+            // Position popout to the left of the menu
+            let menuActor = this.menu.actor ?? this.menu;
+            let [menuX, menuY] = menuActor.get_transformed_position();
+            let [itemX, itemY] = menuItem.get_transformed_position();
+
+            Main.layoutManager.addChrome(popout);
+            popout.set_position(Math.max(0, Math.round(menuX - popout.width - 6)),
+                                Math.round(itemY));
+            this._graphPopout = popout;
+        });
+    }
+
+    _hideGraphPopout() {
+        if (this._graphPopout) {
+            Main.layoutManager.removeChrome(this._graphPopout);
+            this._graphPopout.destroy();
+            this._graphPopout = null;
+        }
+    }
+
+    _shortNum(value, format) {
+        switch (format) {
+            case 'temp': {
+                let suffix = '\u00b0C';
+                let v = value;
+                if (this._settings.get_int('unit') === 1) {
+                    v = (9 / 5) * v + 32;
+                    suffix = '\u00b0F';
+                }
+                return Math.round(v) + suffix;
+            }
+            case 'percent': return Math.round(value) + '%';
+            case 'fan': return Math.round(value) + ' RPM';
+            case 'in': return value.toFixed(1) + ' V';
+            case 'watt': return value.toFixed(1) + ' W';
+            case 'load': return value.toFixed(1);
+            default: {
+                if (Math.abs(value) >= 1e9) return (value / 1e9).toFixed(1) + 'G';
+                if (Math.abs(value) >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+                if (Math.abs(value) >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+                return Math.round(value).toString();
+            }
+        }
     }
 
     // ---------- Value Formatting ----------
@@ -611,6 +817,7 @@ class VitalsMenuButton extends PanelMenu.Button {
     // ---------- Cleanup ----------
 
     destroy() {
+        this._hideGraphPopout();
         if (this._timerId) {
             GLib.source_remove(this._timerId);
             this._timerId = null;
