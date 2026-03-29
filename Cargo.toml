@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/vitals-core", "crates/vitals-daemon", "crates/vitals-app"]
+resolver = "2"
+
+[profile.release]
+lto = true
+strip = true

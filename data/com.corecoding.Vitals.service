@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=com.corecoding.Vitals
+Exec=/usr/bin/vitals-daemon

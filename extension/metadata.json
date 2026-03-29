@@ -1,0 +1,10 @@
+{
+    "description": "Vitals - System monitoring via D-Bus. Requires vitals-daemon to be running.",
+    "gettext-domain": "vitals",
+    "name": "Vitals (D-Bus Client)",
+    "settings-schema": "org.gnome.shell.extensions.vitals",
+    "shell-version": ["45", "46", "47", "48", "49", "50"],
+    "url": "https://github.com/corecoding/Vitals",
+    "uuid": "Vitals@CoreCoding.com",
+    "version": 100
+}

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.corecoding.Vitals</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+
+  <name>Vitals</name>
+  <summary>Monitor your computer's CPU, memory, disk, network, battery, and GPU vitals</summary>
+
+  <description>
+    <p>
+      Vitals is a system monitor that displays real-time information about your
+      computer's hardware including CPU temperature, memory usage, disk I/O,
+      network speed, battery health, fan speed, voltage, and GPU statistics.
+    </p>
+    <p>
+      Features include:
+    </p>
+    <ul>
+      <li>CPU usage, frequency, and temperature monitoring</li>
+      <li>Memory and swap usage tracking</li>
+      <li>Disk usage and I/O speed monitoring</li>
+      <li>Network upload/download speed and public IP detection</li>
+      <li>Battery health and charge status</li>
+      <li>Fan speed and voltage readings</li>
+      <li>GPU monitoring (NVIDIA and AMD)</li>
+      <li>Sensor history graphs</li>
+      <li>Configurable update intervals and display options</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.corecoding.Vitals.desktop</launchable>
+
+  <url type="homepage">https://github.com/corecoding/Vitals</url>
+  <url type="bugtracker">https://github.com/corecoding/Vitals/issues</url>
+
+  <developer id="com.corecoding">
+    <name>Core Coding</name>
+  </developer>
+
+  <content_rating type="oars-1.1" />
+
+  <branding>
+    <color type="primary" scheme_preference="light">#e8f5e9</color>
+    <color type="primary" scheme_preference="dark">#1b5e20</color>
+  </branding>
+
+  <releases>
+    <release version="1.0.0" date="2026-03-28">
+      <description>
+        <p>Initial release of the native Rust application.</p>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>

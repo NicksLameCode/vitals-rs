@@ -1,0 +1,9 @@
+/* Vitals GNOME Shell Extension Stylesheet */
+.vitals-controls {
+    spacing: 8px;
+    padding: 4px;
+}
+
+.vitals-panel-button .panel-status-menu-box {
+    spacing: 4px;
+}

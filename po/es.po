@@ -1,0 +1,546 @@
+# Spanish translation for gnome-shell-extension-vitals.
+#
+# This file is distributed under the same license as the
+# gnome-shell-extension-vitals package.
+#
+# Chris Monahan <chris@corecoding.com>, 2018
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: 2022-04-10 21:29+0200\n"
+"PO-Revision-Date: \n"
+"Last-Translator: Alonso Lara <alonso.lara.plana@gmail.com>\n"
+"Language-Team: \n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.2.1\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: extension.js:129
+msgid "Refresh"
+msgstr "Actualiza"
+
+#: extension.js:147
+msgid "System Monitor"
+msgstr "Monitor de sistema"
+
+#: extension.js:155
+msgid "Preferences"
+msgstr "Preferencias"
+
+#: prefs.ui:42 schemas/org.gnome.shell.extensions.vitals.gschema.xml:81
+msgid "Include public IP address"
+msgstr "Incluir la dirección IP pública"
+
+#: prefs.ui:70
+msgid "Format"
+msgstr "Formato"
+
+#: prefs.ui:78
+msgid "Bytes"
+msgstr ""
+
+#: prefs.ui:79
+msgid "Bits"
+msgstr ""
+
+#: prefs.ui:121
+msgid "General"
+msgstr "General"
+
+#: prefs.ui:149 schemas/org.gnome.shell.extensions.vitals.gschema.xml:11
+msgid "Seconds between updates"
+msgstr "Segundos entre actualizaciones"
+
+#: prefs.ui:184 schemas/org.gnome.shell.extensions.vitals.gschema.xml:16
+msgid "Position in panel"
+msgstr "Posición en el panel"
+
+#: prefs.ui:193
+msgid "Left"
+msgstr "Izquierda"
+
+#: prefs.ui:194
+msgid "Center"
+msgstr "Centrado"
+
+#: prefs.ui:195
+msgid "Right"
+msgstr "Derecha"
+
+#: prefs.ui:196
+#, fuzzy
+msgid "Far Left"
+msgstr "Izquierda"
+
+#: prefs.ui:197
+#, fuzzy
+msgid "Far Right"
+msgstr "Derecha"
+
+#: prefs.ui:220 schemas/org.gnome.shell.extensions.vitals.gschema.xml:21
+msgid "Use higher precision"
+msgstr "Usa una mayor precisión"
+
+#: prefs.ui:247 schemas/org.gnome.shell.extensions.vitals.gschema.xml:26
+msgid "Alphabetize sensors"
+msgstr "Ordenar sensores alfabéticamente"
+
+#: prefs.ui:274 schemas/org.gnome.shell.extensions.vitals.gschema.xml:31
+msgid "Hide zero values"
+msgstr "Ocultar los valores a cero"
+
+#: prefs.ui:301
+msgid "Use fixed widths"
+msgstr "Usar tamaños fijos"
+
+#: prefs.ui:328 schemas/org.gnome.shell.extensions.vitals.gschema.xml:121
+msgid "Hide icons in top bar"
+msgstr "Ocultar iconos en el panel superior"
+
+#: prefs.ui:352
+msgid "About"
+msgstr "Acerca de"
+
+#: prefs.ui:367
+msgid ""
+"Feature requests or bugs? Please visit <a href=\"https://github.com/"
+"corecoding/Vitals/issues\">GitHub</a>. No warranty, expressed or implied. <a "
+"href=\"https://corecoding.com/donate.php\">Donate</a> if you found this "
+"useful."
+msgstr ""
+"¿Te gusta lo que ves? Apoye el desarrollo de esta extensión a través de <a "
+"href=\"https://corecoding.com/donate.php\">PayPal</a>.\n"
+"\n"
+"Sin garantía, expresa o implícita. ¿Peticiones de características o errores? "
+"Por favor visite nuestro proyecto en <a href=\"https://github.com/corecoding/"
+"Vitals\">GitHub</a>."
+
+#: prefs.ui:394
+msgid "Sensors"
+msgstr "Sensores"
+
+#: prefs.ui:422 schemas/org.gnome.shell.extensions.vitals.gschema.xml:36
+msgid "Monitor temperature"
+msgstr "Monitor de la temperatura"
+
+#: prefs.ui:473 schemas/org.gnome.shell.extensions.vitals.gschema.xml:46
+msgid "Monitor voltage"
+msgstr "Monitor del voltaje"
+
+#: prefs.ui:501 schemas/org.gnome.shell.extensions.vitals.gschema.xml:51
+msgid "Monitor fan"
+msgstr "Monitor del ventilador"
+
+#: prefs.ui:529 schemas/org.gnome.shell.extensions.vitals.gschema.xml:56
+msgid "Monitor memory"
+msgstr "Monitor de la memoria"
+
+#: prefs.ui:580 schemas/org.gnome.shell.extensions.vitals.gschema.xml:61
+msgid "Monitor processor"
+msgstr "Monitor del procesador"
+
+#: prefs.ui:608 schemas/org.gnome.shell.extensions.vitals.gschema.xml:66
+msgid "Monitor system"
+msgstr "Monitor del sistema"
+
+#: prefs.ui:636 schemas/org.gnome.shell.extensions.vitals.gschema.xml:76
+msgid "Monitor network"
+msgstr "Monitor de red"
+
+#: prefs.ui:687 schemas/org.gnome.shell.extensions.vitals.gschema.xml:71
+msgid "Monitor storage"
+msgstr "Monitor del almacenamiento"
+
+#: prefs.ui:738 schemas/org.gnome.shell.extensions.vitals.gschema.xml:96
+#, fuzzy
+msgid "Monitor battery"
+msgstr "Monitor de la batería"
+
+#: prefs.ui:817
+msgid "Path"
+msgstr "Ruta"
+
+#: prefs.ui:849 prefs.ui:958
+msgid "Measurement"
+msgstr "Medida"
+
+#: prefs.ui:903
+msgid "Unit"
+msgstr "Unidad"
+
+#: prefs.ui:1012
+msgid "Display Battery"
+msgstr "Batería de la pantalla"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:6
+#, fuzzy
+msgid "Sensors to show in panel"
+msgstr "Posición en el panel"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:7
+msgid "List of sensors to be shown in the panel"
+msgstr "Lista de los sensores que se mostrarán en el panel"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:12
+msgid "Delay between sensor polling"
+msgstr "Retraso entre sondeo de los sensores"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:17
+msgid "Position in Panel ('left', 'center', 'right')"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:22
+msgid "Show one extra digit after decimal"
+msgstr "Mostrar un dígito extra después del decimal"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:27
+msgid "Display sensors in alphabetical order"
+msgstr "Mostrar los sensores en orden alfabético"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:32
+msgid "Hide data from sensors that are invalid"
+msgstr "Ocultar información inválida de los sensores"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:37
+msgid "Display temperature of various components"
+msgstr "Mostrar la temperatura de varios componentes"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:41
+#, fuzzy
+msgid "Temperature unit"
+msgstr "Unidad de temperatura"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:42
+msgid ""
+"The unit ('centigrade' or 'fahrenheit') the extension should display the "
+"temperature in"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:47
+msgid "Display voltage of various components"
+msgstr "Mostrar voltaje de varios componentes"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:52
+msgid "Display fan rotation per minute"
+msgstr "Mostrar rotación por minuto de los ventiladores"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:57
+msgid "Display memory information"
+msgstr "Mostrar información de la memoria"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:62
+msgid "Display processor information"
+msgstr "Mostrar información del procesador"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:67
+msgid "Display system information"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:72
+msgid "Display storage information"
+msgstr "Mostrar información de almacenamiento"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:77
+msgid "Display network information"
+msgstr "Mostrar información de red"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:82
+msgid "Display public IP address of internet connection"
+msgstr "Mostrar IP pública de la conexión a internet"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:86
+msgid "Network speed format"
+msgstr "Formato de velocidad de internet"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:87
+msgid "Should speed display in bits or bytes?"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:91
+#, fuzzy
+msgid "Storage path"
+msgstr "Ruta de almacenamiento"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:92
+msgid "Storage path for monitoring"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:97
+#, fuzzy
+msgid "Monitor battery health"
+msgstr "Monitor de la temperatura"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:101
+msgid "Memory measurement"
+msgstr "Medida de memoria"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:102
+msgid "Can use gigabyte or gibibyte for memory"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:106
+#, fuzzy
+msgid "Storage measurement"
+msgstr "Preferencias del almacenamiento"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:107
+msgid "Can use gigabyte or gibibyte for storage"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:111
+msgid "Battery slot to monitor"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:112
+msgid "Which numerical battery slot should vitals monitor"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:116
+msgid "Use fixed widths in top bar"
+msgstr "Usar tamaños fijos en el panel superior"
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:117
+msgid "Keep sensors in top bar from jumping around"
+msgstr ""
+
+#: schemas/org.gnome.shell.extensions.vitals.gschema.xml:122
+msgid "Keep top bar clean by only showing sensor values"
+msgstr ""
+
+#: sensors.js:42
+#, fuzzy
+msgid "Temperature"
+msgstr "Temperatura"
+
+#: sensors.js:43 sensors.js:307 sensors.js:337
+msgid "Voltage"
+msgstr "Voltaje"
+
+#: sensors.js:44
+msgid "Fan"
+msgstr "Ventilador"
+
+#: sensors.js:45
+msgid "Memory"
+msgstr "Memoria"
+
+#: sensors.js:46
+msgid "Processor"
+msgstr "Procesador"
+
+#: sensors.js:47
+msgid "System"
+msgstr "Sistema"
+
+#: sensors.js:48
+msgid "Network"
+msgstr "Red"
+
+#: sensors.js:49
+#, fuzzy
+msgid "Storage"
+msgstr "Almacenamiento"
+
+#: sensors.js:76
+msgid "Public IP"
+msgstr "IP pública"
+
+#: sensors.js:144
+msgid "Usage"
+msgstr "Uso"
+
+#: sensors.js:145
+#, fuzzy
+msgid "memory"
+msgstr "Memoria"
+
+#: sensors.js:146
+msgid "Physical"
+msgstr "Físico"
+
+#: sensors.js:147
+msgid "Available"
+msgstr "Disponible"
+
+#: sensors.js:148
+msgid "Allocated"
+msgstr "Asignado"
+
+#: sensors.js:149
+msgid "Swap"
+msgstr "Intercambio"
+
+#: sensors.js:189
+msgid "Average"
+msgstr "Promedio"
+
+#: sensors.js:190
+#, fuzzy
+msgid "processor"
+msgstr "Procesador"
+
+#: sensors.js:192
+#, javascript-format
+msgid "Core %d"
+msgstr "Núcleo %d"
+
+#: sensors.js:236
+msgid "Frequency"
+msgstr "Frecuencia promedio"
+
+#: sensors.js:237
+msgid "Boost"
+msgstr "Turbo"
+
+#: sensors.js:238
+msgid "Vendor"
+msgstr ""
+
+#: sensors.js:239
+msgid "Bogomips"
+msgstr ""
+
+#: sensors.js:240
+msgid "Sockets"
+msgstr ""
+
+#: sensors.js:241
+msgid "Cache"
+msgstr "Caché"
+
+#: sensors.js:250
+msgid "Open Files"
+msgstr ""
+
+#: sensors.js:258
+msgid "Load 1m"
+msgstr "Carga (1m)"
+
+#: sensors.js:259
+#, fuzzy
+msgid "system"
+msgstr "Sistema"
+
+#: sensors.js:260
+msgid "Load 5m"
+msgstr "Carga (5m)"
+
+#: sensors.js:261
+msgid "Load 15m"
+msgstr "Carga (15m)"
+
+#: sensors.js:262
+msgid "Threads Active"
+msgstr "Hilos activos"
+
+#: sensors.js:263
+msgid "Threads Total"
+msgstr "Total de hilos"
+
+#: sensors.js:269
+msgid "Uptime"
+msgstr "Tiempo encendido"
+
+#: sensors.js:273
+msgid "Process Time"
+msgstr "Tiempo activo promedio"
+
+#: sensors.js:290
+msgid "State"
+msgstr "Estado"
+
+#: sensors.js:295
+msgid "Cycles"
+msgstr "Ciclos"
+
+#: sensors.js:300 sensors.js:330
+msgid "Energy (full)"
+msgstr "Energía (llena)"
+
+#: sensors.js:302 sensors.js:332
+msgid "Capacity"
+msgstr "Capacidad"
+
+#: sensors.js:303 sensors.js:333
+msgid "Energy (design)"
+msgstr ""
+
+#: sensors.js:311 sensors.js:340
+msgid "Rate"
+msgstr ""
+
+#: sensors.js:312 sensors.js:341
+#, fuzzy
+msgid "battery"
+msgstr "batería"
+
+#: sensors.js:316 sensors.js:344
+msgid "Energy (now)"
+msgstr "Energía (ahora)"
+
+#: sensors.js:322 sensors.js:350
+msgid "Percentage"
+msgstr "Porcentaje"
+
+#: sensors.js:411
+msgid "WiFi Link Quality"
+msgstr ""
+
+#: sensors.js:412
+msgid "WiFi Signal Level"
+msgstr ""
+
+#: sensors.js:432
+msgid "ARC Target"
+msgstr ""
+
+#: sensors.js:433
+#, fuzzy
+msgid "ARC Maximum"
+msgstr "Máximo "
+
+#: sensors.js:434
+msgid "ARC Current"
+msgstr ""
+
+#: sensors.js:445
+#, fuzzy
+msgid "Read total"
+msgstr "Total de lectura"
+
+#: sensors.js:446
+msgid "Write total"
+msgstr "Total de escritura"
+
+#: sensors.js:447
+msgid "Read rate"
+msgstr "Tasa de lectura"
+
+#: sensors.js:448
+msgid "Write rate"
+msgstr "Tasa de escritura"
+
+#: sensors.js:467
+msgid "Total"
+msgstr "Total"
+
+#: sensors.js:468
+msgid "Used"
+msgstr "Usado"
+
+#: sensors.js:469
+msgid "Reserved"
+msgstr "Reservado"
+
+#: sensors.js:470
+msgid "Free"
+msgstr "Libre"
+
+#: sensors.js:471
+#, fuzzy
+msgid "storage"
+msgstr "Monitor del almacenamiento"

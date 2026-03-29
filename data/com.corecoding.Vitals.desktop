@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Vitals
+Comment=Monitor CPU, memory, disk, network, battery, and GPU vitals
+Exec=vitals-app
+Icon=com.corecoding.Vitals
+Terminal=false
+Type=Application
+Categories=System;Monitor;
+Keywords=cpu;memory;disk;network;battery;gpu;temperature;monitor;
