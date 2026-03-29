@@ -1,147 +1,246 @@
 <div align="center">
 
+<br>
+
+<img src="https://raw.githubusercontent.com/NicksLameCode/vitals-rs/main/data/icons/original/cpu-symbolic.svg" width="80" alt="Vitals">
+
 # vitals-rs
 
-**A native Rust system monitor for the Linux desktop**
+### Your system's vital signs, at a glance.
 
-A ground-up rewrite of the popular [Vitals](https://github.com/corecoding/Vitals) GNOME Shell extension as a standalone GTK4/Adwaita application with a D-Bus daemon and optional shell extension.
+A ground-up Rust rewrite of the popular [Vitals](https://github.com/corecoding/Vitals) GNOME Shell extension --
+rebuilt as a native GTK4/Adwaita desktop app, D-Bus daemon, and optional shell extension.
 
-[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-2024_edition-orange.svg)](https://www.rust-lang.org/)
-[![GTK4](https://img.shields.io/badge/GTK4-Adwaita-4a86cf.svg)](https://gtk-rs.org/)
-[![Tests](https://img.shields.io/badge/tests-105_passing-brightgreen.svg)]()
+<br>
+
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue?style=for-the-badge)](LICENSE)
+&nbsp;
+[![Rust](https://img.shields.io/badge/Rust-2024_Edition-f74c00?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+&nbsp;
+[![GTK4](https://img.shields.io/badge/GTK4-Adwaita-4a86cf?style=for-the-badge&logo=gnome&logoColor=white)](https://gtk-rs.org/)
+&nbsp;
+[![Tests](https://img.shields.io/badge/Tests-105_Passing-2ea44f?style=for-the-badge)]()
+
+<br>
+
+<!-- Replace with real screenshot when available -->
+<!--
+<img src="data/screenshots/vitals-rs-screenshot.png" alt="Vitals screenshot" width="720">
+<br><br>
+-->
+
+[Features](#features) &#8226;
+[Performance](#performance) &#8226;
+[Installation](#installation) &#8226;
+[Usage](#usage) &#8226;
+[Configuration](#configuration) &#8226;
+[Contributing](#development)
+
+<br>
 
 </div>
 
 ---
 
-<!-- Screenshot will go here once available -->
-<!-- <p align="center"><img src="data/screenshots/vitals-rs-screenshot.png" alt="Vitals screenshot" width="720" /></p> -->
+<br>
 
 ## Features
 
-- **10 sensor categories** -- temperature, voltage, fan, memory, processor, system, network, storage, battery, and GPU
-- **GPU monitoring** -- NVIDIA via `nvidia-smi` subprocess, AMD and Intel via DRM sysfs
-- **GTK4 / Adwaita** native desktop application with preferences dialog
-- **D-Bus daemon** for headless servers, scripting, and extension integration
-- **GNOME Shell extension** -- a thin ~215-line JavaScript client that reads sensor data from the daemon over D-Bus
-- **Time-series history** with Cairo-rendered graphs, persisted across sessions
-- **105 unit tests** with deterministic parsing tests for every sensor module
-- **20 language translations** via gettext (`.po` files)
-- **TOML configuration** at `~/.config/vitals/config.toml`
-- **Flatpak-ready** build manifest included (GNOME Platform 47)
-- **Release-optimized** with LTO and symbol stripping
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Comprehensive Monitoring**
+- 10 sensor categories out of the box
+- Temperature, voltage, fan, memory, CPU, system, network, storage, battery, GPU
+- NVIDIA via `nvidia-smi`, AMD/Intel via DRM sysfs
+- Per-core CPU usage and frequency tracking
+- ZFS ARC cache statistics
+
+</td>
+<td width="50%" valign="top">
+
+**Modern Architecture**
+- Pure Rust sensor library with zero GTK dependencies
+- GTK4/Adwaita native desktop application
+- D-Bus daemon for headless servers and scripting
+- Thin GNOME Shell extension (~215 lines, D-Bus client only)
+- Cargo workspace with clean separation of concerns
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Production Ready**
+- 105 unit tests with deterministic parsing
+- 20 language translations via gettext
+- TOML configuration with preferences UI
+- Flatpak manifest included (GNOME Platform 47)
+- Meson build system for distro packaging
+
+</td>
+<td width="50%" valign="top">
+
+**Built for Performance**
+- 4.8x less memory than the GJS original
+- Zero garbage collection pauses
+- Native threading for subprocess management
+- LTO-optimized release binaries
+- Time-series history with Cairo-rendered graphs
+
+</td>
+</tr>
+</table>
+
+<br>
+
+---
+
+<br>
 
 ## Performance
 
-Real benchmarks comparing vitals-rs against the original [Vitals](https://github.com/corecoding/Vitals) GJS extension, measured on the same machine (AMD Ryzen, 28 GiB RAM, Fedora 45, kernel 7.0).
+> Real benchmarks measured on the same machine (AMD Ryzen, 28 GiB RAM, Fedora 45, kernel 7.0).
+> Reproduce with `cargo run --release --example benchmark`.
+
+<br>
+
+<table>
+<tr>
+<th width="25%" align="center">4.8x</th>
+<th width="25%" align="center">2x</th>
+<th width="25%" align="center">13%</th>
+<th width="25%" align="center">0</th>
+</tr>
+<tr>
+<td align="center"><strong>Less Memory</strong><br><sub>15.4 MiB vs 73.9 MiB RSS</sub></td>
+<td align="center"><strong>Faster Formatting</strong><br><sub>0.105 us vs 0.203 us/call</sub></td>
+<td align="center"><strong>Faster P99 Latency</strong><br><sub>26.9 ms vs 31.0 ms</sub></td>
+<td align="center"><strong>GC Pauses</strong><br><sub>Ownership model, no runtime</sub></td>
+</tr>
+</table>
+
+<br>
 
 ### Memory Usage
 
-| Metric | vitals-rs (Rust) | Vitals (GJS) | Improvement |
-|--------|----------------:|-------------:|:-----------:|
+The Rust daemon uses **15.4 MiB RSS** while collecting all 10 sensor categories. The GJS extension consumes 35-74 MiB for its JavaScript runtime alone, before accounting for GNOME Shell overhead.
+
+| | vitals-rs | Vitals (GJS) | Delta |
+|:--|--:|--:|:--:|
 | RSS (idle, after first poll) | **15.4 MiB** | 73.9 MiB | **4.8x less** |
 | RSS (runtime baseline) | **15.4 MiB** | 34.7 MiB | **2.3x less** |
 
-The Rust daemon uses 15.4 MiB RSS while collecting all 10 sensor categories. The GJS extension running inside GNOME Shell consumes 35-74 MiB for its JavaScript runtime alone, before accounting for GNOME Shell's own overhead.
-
 ### Sensor Poll Latency
 
-Measured over 100 consecutive sensor polls, each reading temperature, voltage, fan, memory, CPU, system, network, and storage sensors from `/proc` and `/sys`:
+100 consecutive polls reading temperature, voltage, fan, memory, CPU, system, network, and storage from `/proc` and `/sys`:
 
-| Metric | vitals-rs (Rust) | Vitals (GJS) |
-|--------|----------------:|-------------:|
+| | vitals-rs | Vitals (GJS) |
+|:--|--:|--:|
 | Average | **17.7 ms** | 18.3 ms |
-| Median (P50) | **17.1 ms** | 17.6 ms |
-| Min | **15.0 ms** | 16.3 ms |
-| Max | 30.9 ms | 36.1 ms |
-| P99 | 26.9 ms | 31.0 ms |
-| Readings per poll | **71** | -- |
+| Median | **17.1 ms** | 17.6 ms |
+| P99 | **26.9 ms** | 31.0 ms |
+| Max | **30.9 ms** | 36.1 ms |
+| Readings/poll | **71** | -- |
 
-Poll latency is I/O-bound (kernel virtual filesystem reads), so both implementations are close. The Rust version is consistently faster at the tail end (P99: 27ms vs 31ms) due to zero GC pauses, and it does **full parsing + computation** in the same pass, while the GJS numbers only measure raw file reads.
+Both are I/O-bound (kernel VFS reads), but Rust is consistently faster at the tail -- zero GC pauses mean no surprise latency spikes. The Rust numbers include **full parsing and computation**; the GJS numbers measure raw file reads only.
 
 ### Value Formatting
 
-Formatting 50,000 sensor values (temperature, percent, hertz, memory, watt conversions with unit scaling):
+50,000 sensor values formatted (temperature, percent, hertz, memory, watt with unit scaling):
 
-| Metric | vitals-rs (Rust) | Vitals (GJS) | Improvement |
-|--------|----------------:|-------------:|:-----------:|
-| Total time | **5.2 ms** | 10.2 ms | **2.0x faster** |
+| | vitals-rs | Vitals (GJS) | Delta |
+|:--|--:|--:|:--:|
+| Total | **5.2 ms** | 10.2 ms | **2.0x faster** |
 | Per call | **0.105 us** | 0.203 us | **1.9x faster** |
 
-### Binary Size
+### Engineering Comparison
 
-| Component | Size |
-|-----------|-----:|
-| `vitals-app` (release, stripped) | 4.5 MiB |
-| `vitals-daemon` (release, stripped) | 6.1 MiB |
-| Original GJS extension (all .js files) | 144 KiB |
-
-The Rust binaries are self-contained with no runtime dependencies beyond GTK4/Adwaita system libraries. The GJS extension is smaller on disk but requires the full GNOME Shell + GJS runtime (hundreds of MiB).
-
-### Additional Benefits
-
-| Aspect | vitals-rs (Rust) | Vitals (GJS) |
-|--------|:---:|:---:|
+| | vitals-rs | Vitals (GJS) |
+|:--|:--:|:--:|
 | Type safety | Compile-time | Runtime |
 | Concurrency | Native threads | Single-threaded |
 | GC pauses | None | Periodic |
-| Unit tests | 105 | 0 |
-| Memory leaks | Ownership model prevents | Manual management |
-| Crash safety | `Result`/`Option` | Uncaught exceptions |
+| Unit tests | **105** | 0 |
+| Memory safety | Ownership model | Manual |
+| Error handling | `Result` / `Option` | Exceptions |
 
-### Reproducing These Benchmarks
+<br>
 
-```bash
-cd vitals-rs
-cargo run --release --example benchmark
-```
+---
+
+<br>
 
 ## Architecture
 
-vitals-rs is organized as a Cargo workspace with three crates:
-
 ```
-vitals-core          (library -- sensor providers, config, formatting, history)
-    |
-    +--- vitals-app      (binary -- GTK4/Adwaita desktop application)
-    |
-    +--- vitals-daemon   (binary -- D-Bus service, headless polling)
-              |
-              +--- extension.js   (GNOME Shell extension, reads D-Bus)
+                        +------------------+
+                        |   vitals-core    |    Pure Rust library
+                        |                  |    No GTK dependencies
+                        |  Sensors, Config |
+                        |  Format, History |
+                        +--------+---------+
+                                 |
+                    +------------+------------+
+                    |                         |
+           +--------v--------+      +---------v--------+
+           |   vitals-app    |      |  vitals-daemon   |
+           |                 |      |                  |
+           |  GTK4/Adwaita   |      |  D-Bus Service   |
+           |  Desktop App    |      |  Headless Mode   |
+           +-----------------+      +--------+---------+
+                                             |
+                                    +--------v--------+
+                                    |  extension.js   |
+                                    |                 |
+                                    |  GNOME Shell    |
+                                    |  Panel Client   |
+                                    +-----------------+
 ```
 
-| Crate | Type | Description |
-|-------|------|-------------|
-| `vitals-core` | Library | Sensor discovery and polling, hwmon parsing, config, unit formatting, time-series history |
-| `vitals-app` | Binary | GTK4/libadwaita UI with sensor groups, live graphs, and a preferences dialog |
-| `vitals-daemon` | Binary | Tokio + zbus D-Bus service exposing `com.corecoding.Vitals.Sensors` on the session bus |
+| Crate | Description |
+|:------|:------------|
+| **vitals-core** | Sensor discovery and polling, hwmon parsing, TOML config, value formatting, time-series history with JSON persistence. Zero GUI dependencies. |
+| **vitals-app** | GTK4/libadwaita desktop UI with collapsible sensor groups, hot sensors bar, Cairo history graphs, and a full preferences dialog. |
+| **vitals-daemon** | Headless D-Bus service (`com.corecoding.Vitals.Sensors`) built on zbus. Polls sensors on a timer and serves readings to any D-Bus client. |
+| **extension.js** | Thin GNOME Shell extension (~215 lines). Connects to the daemon over D-Bus, renders sensor values in the top panel. Zero file I/O. |
 
 The **`SensorProvider`** trait is the central abstraction. Each sensor category implements `discover()` for one-time hardware enumeration and `query(dwell)` for periodic polling. A `SensorManager` coordinates all enabled providers based on the loaded `AppConfig`.
+
+<br>
+
+---
+
+<br>
 
 ## Installation
 
 ### Dependencies
 
-Install the build-time and runtime dependencies for your distribution.
-
-**Fedora / RHEL:**
+<details>
+<summary><strong>Fedora / RHEL</strong></summary>
 
 ```bash
 sudo dnf install gtk4-devel libadwaita-devel gettext-devel meson ninja-build cargo
 ```
+</details>
 
-**Ubuntu / Debian:**
+<details>
+<summary><strong>Ubuntu / Debian</strong></summary>
 
 ```bash
 sudo apt install libgtk-4-dev libadwaita-1-dev gettext meson ninja-build cargo
 ```
+</details>
 
-**Arch Linux:**
+<details>
+<summary><strong>Arch Linux</strong></summary>
 
 ```bash
 sudo pacman -S gtk4 libadwaita gettext meson ninja cargo
 ```
+</details>
 
 ### Build from source
 
@@ -153,7 +252,7 @@ cargo build --workspace --release
 
 Binaries are placed in `target/release/vitals-app` and `target/release/vitals-daemon`.
 
-### System install (meson + ninja)
+### System install
 
 ```bash
 meson setup builddir --prefix=/usr
@@ -161,91 +260,98 @@ ninja -C builddir
 sudo ninja -C builddir install
 ```
 
-This installs binaries to `/usr/bin/`, desktop files, icons, gschema XML, and translations.
+Installs binaries, desktop file, D-Bus service, GSettings schema, icons, and translations.
 
-### Flatpak (future)
+### Flatpak
 
-A Flatpak manifest is included at `build-aux/flatpak/com.corecoding.Vitals.json` targeting the GNOME 47 runtime. Building:
+A manifest is included at `build-aux/flatpak/com.corecoding.Vitals.json` targeting GNOME 47:
 
 ```bash
 flatpak-builder --user --install builddir build-aux/flatpak/com.corecoding.Vitals.json
 ```
 
+<br>
+
+---
+
+<br>
+
 ## Usage
 
-### Desktop application
+### Desktop App
 
 ```bash
 vitals-app
 ```
 
-Or launch "Vitals" from your application menu after a system install.
+Or launch **Vitals** from your application menu after system install.
 
-### D-Bus daemon
+### D-Bus Daemon
 
 ```bash
 vitals-daemon
 ```
 
-The daemon registers `com.corecoding.Vitals` on the session bus and exposes the `com.corecoding.Vitals.Sensors` interface at `/com/corecoding/Vitals`. It polls sensors at the configured interval and serves readings over D-Bus.
-
-You can query the daemon from the command line:
+Query it from the command line:
 
 ```bash
-# Get all numeric readings
+# Get all sensor readings
 busctl --user call com.corecoding.Vitals /com/corecoding/Vitals \
     com.corecoding.Vitals.Sensors GetReadings
 
-# Get time-series data for a sensor
+# Get time-series history for a sensor
 busctl --user call com.corecoding.Vitals /com/corecoding/Vitals \
     com.corecoding.Vitals.Sensors GetTimeSeries s "_memory_usage_"
 ```
 
-### GNOME Shell extension
+### GNOME Shell Extension
 
-The optional GNOME Shell extension lives in `extension/` and acts as a thin D-Bus client (~215 lines). It requires the daemon to be running.
+The optional GNOME Shell extension (supporting versions 45-50) requires the daemon to be running:
 
 ```bash
-# Copy to GNOME Shell extensions directory
+# Install the extension
 mkdir -p ~/.local/share/gnome-shell/extensions/Vitals@CoreCoding.com
 cp extension/* ~/.local/share/gnome-shell/extensions/Vitals@CoreCoding.com/
 
-# Start the daemon (or set it up as a systemd user service)
+# Start the daemon
 vitals-daemon &
 
-# Restart GNOME Shell (X11) or log out and back in (Wayland)
+# Restart GNOME Shell (X11) or re-login (Wayland)
 ```
 
-Supports GNOME Shell versions 45 through 50.
+<br>
 
-### Configuration
+---
 
-Configuration is stored at:
-
-```
-~/.config/vitals/config.toml
-```
-
-If the file does not exist, defaults are used. The configuration is created automatically when you change settings in the preferences dialog or through the D-Bus `SetConfig` method.
+<br>
 
 ## Sensor Coverage
 
-| Category | Data Source | Readings |
-|----------|------------|----------|
-| **Temperature** | `/sys/class/hwmon/*/temp*_input` | CPU, GPU, chipset, drive temps |
-| **Voltage** | `/sys/class/hwmon/*/in*_input` | CPU Vcore, DIMM, 3.3V, 5V, 12V rails |
-| **Fan** | `/sys/class/hwmon/*/fan*_input` | Fan RPM for each detected fan |
-| **Memory** | `/proc/meminfo` | Usage %, used/free/cached/swap, physical total |
-| **Processor** | `/proc/stat`, `/proc/cpuinfo`, `/sys/devices/system/cpu/*/cpufreq/` | Per-core usage %, frequencies, model name |
-| **System** | `/proc/uptime`, `/proc/loadavg`, `/proc/sys/fs/file-nr`, `/etc/hostname` | Uptime, load averages, open file count, hostname, kernel |
-| **Network** | `/sys/class/net/*/statistics/`, `/proc/net/wireless` | TX/RX speeds per interface, WiFi quality, public IP |
-| **Storage** | `/proc/mounts`, `/proc/diskstats`, `/proc/spl/kstat/zfs/arcstats` | Disk usage, read/write rates, ZFS ARC stats |
-| **Battery** | `/sys/class/power_supply/BAT*/uevent` | Charge %, state, voltage, current, time remaining, cycles |
-| **GPU** | `nvidia-smi` (NVIDIA) or `/sys/class/drm/card*/` (AMD/Intel) | Utilization, temp, VRAM, power, clocks, PCIe link |
+| Category | Source | What it monitors |
+|:---------|:-------|:-----------------|
+| **Temperature** | `/sys/class/hwmon/*/temp*_input` | CPU package, per-core, GPU, chipset, NVMe, wireless adapter |
+| **Voltage** | `/sys/class/hwmon/*/in*_input` | CPU Vcore, DIMM, 3.3V / 5V / 12V rails |
+| **Fan** | `/sys/class/hwmon/*/fan*_input` | RPM for each detected fan |
+| **Memory** | `/proc/meminfo` | Usage %, allocated, free, cached, swap usage and totals |
+| **Processor** | `/proc/stat`, `cpufreq`, `/proc/cpuinfo` | Per-core usage %, avg/min/max frequency, vendor, cache |
+| **System** | `/proc/loadavg`, `/proc/uptime` | Load averages, uptime, open files, threads, kernel version |
+| **Network** | `/sys/class/net/*/statistics/` | Per-interface TX/RX speeds, WiFi quality, public IP |
+| **Storage** | `/proc/diskstats`, `statvfs` | Disk usage, read/write rates, ZFS ARC stats |
+| **Battery** | `/sys/class/power_supply/BAT*/uevent` | Charge %, state, voltage, power, time remaining, cycles |
+| **GPU** | `nvidia-smi` or `/sys/class/drm/card*/` | Utilization, temperature, VRAM, power, clocks, PCIe link |
+
+<br>
+
+---
+
+<br>
 
 ## Configuration
 
-The TOML configuration file supports the following sections:
+Config lives at `~/.config/vitals/config.toml`. Created automatically on first preferences save.
+
+<details>
+<summary><strong>Full configuration reference</strong></summary>
 
 ```toml
 [general]
@@ -254,6 +360,9 @@ use_higher_precision = false # Extra decimal digit
 alphabetize = true           # Sort sensors alphabetically
 hide_zeros = false           # Hide sensors reporting zero
 fixed_widths = true          # Prevent UI jitter
+hide_icons = false           # Hide icons in panel
+menu_centered = false        # Center dropdown menu
+icon_style = 0               # 0 = Original, 1 = GNOME
 monitor_cmd = "gnome-system-monitor"
 
 [temperature]
@@ -272,7 +381,7 @@ measurement = 1              # 0 = binary (GiB), 1 = decimal (GB)
 
 [processor]
 show = true
-include_static_info = false  # Include CPU model name
+include_static_info = false
 
 [system]
 show = true
@@ -289,7 +398,7 @@ measurement = 1              # 0 = binary (GiB), 1 = decimal (GB)
 
 [battery]
 show = false
-slot = 0                     # Battery slot index (0-7)
+slot = 0                     # 0 = BAT0, 1 = BAT1, ... 7 = macsmc-battery
 
 [gpu]
 show = false
@@ -297,144 +406,111 @@ include_static_info = false
 
 [history]
 show_graphs = true
-duration_seconds = 3600      # Seconds of history to keep
+duration_seconds = 3600      # 1 hour of history
 
-# Sensors pinned to the panel / header
 hot_sensors = [
     "_memory_usage_",
     "_system_load_1m_",
     "__network-rx_max__",
 ]
 ```
+</details>
+
+<br>
+
+---
+
+<br>
 
 ## Development
 
-### Running tests
+### Quick start
 
 ```bash
-cargo test --workspace
+git clone https://github.com/NicksLameCode/vitals-rs.git
+cd vitals-rs
+
+cargo build --workspace          # Build all crates
+cargo test --workspace           # Run 105 tests
+cargo run -p vitals-app          # Launch the GTK4 app
+cargo run -p vitals-daemon       # Start the D-Bus daemon
+cargo run --release --example benchmark   # Run benchmarks
 ```
 
-All 105 tests are deterministic -- sensor parsing functions accept string contents rather than reading from the filesystem, making them runnable in any environment including CI.
-
-### Project structure
-
-```
-vitals-rs/
-+-- Cargo.toml                     Workspace root
-+-- meson.build                    Meson build for system install
-+-- crates/
-|   +-- vitals-core/
-|   |   +-- src/
-|   |       +-- lib.rs             Public modules
-|   |       +-- config.rs          AppConfig (TOML serde)
-|   |       +-- format.rs          Unit formatting (legible values)
-|   |       +-- history.rs         TimeSeriesStore (JSON persistence)
-|   |       +-- hwmon.rs           /sys/class/hwmon discovery
-|   |       +-- sensors/
-|   |           +-- mod.rs         SensorProvider trait, SensorManager
-|   |           +-- temperature.rs
-|   |           +-- voltage.rs
-|   |           +-- fan.rs
-|   |           +-- memory.rs
-|   |           +-- processor.rs
-|   |           +-- system.rs
-|   |           +-- network.rs
-|   |           +-- storage.rs
-|   |           +-- battery.rs
-|   |           +-- gpu/
-|   |               +-- mod.rs     GpuProvider coordinator
-|   |               +-- nvidia.rs  nvidia-smi subprocess
-|   |               +-- amd.rs     AMD-specific DRM parsing
-|   |               +-- drm.rs     Generic DRM sysfs discovery
-|   +-- vitals-app/
-|   |   +-- src/
-|   |       +-- main.rs
-|   |       +-- app.rs
-|   |       +-- window.rs
-|   |       +-- widgets/
-|   |           +-- mod.rs
-|   |           +-- sensor_row.rs
-|   |           +-- sensor_group.rs
-|   |           +-- history_graph.rs
-|   |           +-- preferences.rs
-|   +-- vitals-daemon/
-|       +-- src/
-|           +-- main.rs            Polling loop
-|           +-- dbus.rs            zbus interface
-+-- extension/
-|   +-- extension.js               GNOME Shell D-Bus client
-|   +-- metadata.json
-|   +-- stylesheet.css
-+-- data/
-|   +-- com.corecoding.Vitals.desktop
-|   +-- com.corecoding.Vitals.metainfo.xml
-|   +-- com.corecoding.Vitals.gschema.xml
-+-- po/                            20 translation files (.po)
-+-- build-aux/flatpak/             Flatpak build manifest
-```
-
-### Adding a new sensor provider
-
-1. Create a new file in `crates/vitals-core/src/sensors/` (e.g., `bluetooth.rs`).
-
-2. Implement the `SensorProvider` trait:
-
-    ```rust
-    use crate::sensors::{SensorCategory, SensorProvider, SensorReading};
-
-    pub struct BluetoothProvider { /* ... */ }
-
-    impl SensorProvider for BluetoothProvider {
-        fn category(&self) -> SensorCategory {
-            // Add a new variant to SensorCategory if needed
-            SensorCategory::System
-        }
-
-        fn discover(&mut self) -> Vec<SensorReading> {
-            // One-time device enumeration
-            Vec::new()
-        }
-
-        fn query(&mut self, dwell: f64) -> Vec<SensorReading> {
-            // Read current values
-            Vec::new()
-        }
-    }
-    ```
-
-3. Add the module to `sensors/mod.rs` and register it in `SensorManager::new()`.
-
-4. Add a corresponding config section in `config.rs` with a `show` field.
-
-5. Write parsing tests with sample data strings (see existing tests for patterns).
-
-### Linting and formatting
+### Linting
 
 ```bash
 cargo fmt --all
 cargo clippy --workspace -- -D warnings
 ```
 
+### Adding a new sensor
+
+1. Create `crates/vitals-core/src/sensors/your_sensor.rs`
+2. Implement the `SensorProvider` trait (`discover()` + `query()`)
+3. Add a config section in `config.rs` with a `show` field
+4. Register in `SensorManager::new()` in `sensors/mod.rs`
+5. Write tests with sample data strings
+
+See existing providers for patterns. All parsing functions accept `&str` input for deterministic testing.
+
+### Project structure
+
+```
+vitals-rs/
+  Cargo.toml                     Workspace root
+  meson.build                    System install
+  crates/
+    vitals-core/                 Sensor library (no GTK)
+      src/
+        sensors/                 10 sensor providers
+          gpu/                   NVIDIA + AMD + DRM
+        config.rs                TOML configuration
+        format.rs                Value formatting
+        history.rs               Time-series storage
+        hwmon.rs                 Hardware monitor discovery
+      examples/
+        benchmark.rs             Performance benchmarks
+    vitals-app/                  GTK4/Adwaita desktop app
+      src/widgets/               UI components
+    vitals-daemon/               D-Bus service
+  extension/                     GNOME Shell extension
+  data/                          Desktop file, icons, schemas
+  po/                            20 translations
+  build-aux/flatpak/             Flatpak manifest
+```
+
+<br>
+
+---
+
+<br>
+
 ## Translations
 
-vitals-rs supports **20 languages**: Arabic, Belarusian, Catalan, Chinese (Simplified), Czech, Dutch, English, Finnish, French, German, Italian, Burmese, Occitan, Polish, Portuguese, Portuguese (Brazilian), Russian, Slovak, Turkish, and Ukrainian.
+vitals-rs ships with **20 translations**: Arabic, Belarusian, Catalan, Chinese (Simplified), Czech, Dutch, Finnish, French, German, Italian, Burmese, Occitan, Polish, Portuguese, Portuguese (Brazilian), Russian, Slovak, Turkish, and Ukrainian.
 
-Translation files are in the `po/` directory using standard gettext `.po` format. To contribute a translation:
+To add a new language:
 
-1. Copy `po/vitals.pot` to `po/<lang_code>.po`.
-2. Translate the strings using a tool like [Poedit](https://poedit.net/) or a text editor.
-3. Add your language code to `po/LINGUAS`.
-4. Submit a pull request.
+1. Copy `po/vitals.pot` to `po/<lang>.po`
+2. Translate with [Poedit](https://poedit.net/) or any text editor
+3. Add your language code to `po/LINGUAS`
+4. Submit a pull request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+<br>
+
+---
+
+<br>
 
 ## Credits
 
-vitals-rs is a Rust rewrite of [Vitals](https://github.com/corecoding/Vitals) by [corecoding](https://github.com/corecoding). The original project is a widely-used GNOME Shell extension written in GJS (JavaScript) that has been providing system monitoring to the GNOME desktop for years.
-
-This rewrite aims to bring the same monitoring capabilities to a standalone native application while maintaining compatibility through the D-Bus interface and an optional lightweight shell extension.
+vitals-rs is a Rust rewrite of [**Vitals**](https://github.com/corecoding/Vitals) by [corecoding](https://github.com/corecoding) -- a widely-used GNOME Shell extension that has been providing system monitoring to the Linux desktop for years. This project brings the same monitoring capabilities to a standalone native application with improved performance and reliability.
 
 ## License
 
-This project is licensed under the **BSD-3-Clause License**. See the [LICENSE](LICENSE) file for details.
+Licensed under the [BSD-3-Clause License](LICENSE).
+
+<br>
