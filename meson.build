@@ -1,5 +1,4 @@
 project('vitals',
-  'rust',
   version: '1.0.0',
   license: 'BSD-3-Clause',
   meson_version: '>= 0.59.0',
@@ -14,29 +13,30 @@ datadir = prefix / get_option('datadir')
 
 cargo = find_program('cargo')
 
+cargo_target_dir = meson.project_build_root() / 'cargo-target'
+
 cargo_build = custom_target('cargo-build',
   build_by_default: true,
   build_always_stale: true,
-  output: ['vitals-app', 'vitals-daemon'],
+  output: ['vitals-build-stamp'],
   console: true,
   command: [
-    cargo, 'build',
-    '--manifest-path', meson.project_source_root() / 'Cargo.toml',
-    '--release',
-    '--target-dir', meson.project_build_root() / 'cargo-target',
+    'sh', '-c',
+    cargo.full_path() + ' build' +
+    ' --manifest-path ' + meson.project_source_root() / 'Cargo.toml' +
+    ' --release' +
+    ' --target-dir ' + cargo_target_dir +
+    ' && touch @OUTPUT0@',
   ],
 )
 
-install_data(
-  meson.project_build_root() / 'cargo-target' / 'release' / 'vitals-app',
-  install_dir: bindir,
-  install_mode: 'rwxr-xr-x',
+# Install binaries via meson.add_install_script so they are copied
+# after the cargo build completes (install_data validates at configure time).
+meson.add_install_script('sh', '-c',
+  'install -Dm755 "' + cargo_target_dir / 'release' / 'vitals-app' + '" "$DESTDIR/@0@"'.format(bindir / 'vitals-app')
 )
-
-install_data(
-  meson.project_build_root() / 'cargo-target' / 'release' / 'vitals-daemon',
-  install_dir: bindir,
-  install_mode: 'rwxr-xr-x',
+meson.add_install_script('sh', '-c',
+  'install -Dm755 "' + cargo_target_dir / 'release' / 'vitals-daemon' + '" "$DESTDIR/@0@"'.format(bindir / 'vitals-daemon')
 )
 
 subdir('data')
