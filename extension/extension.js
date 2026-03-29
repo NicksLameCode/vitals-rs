@@ -1,8 +1,11 @@
 /*
-  Vitals - Thin D-Bus client for GNOME Shell panel integration.
-  Reads sensor data from the vitals-daemon D-Bus service.
+  Vitals (D-Bus Client) - Thin GNOME Shell extension that reads sensor
+  data from the vitals-daemon D-Bus service and renders it in the panel.
+
+  Matches the original Vitals extension's UI design language.
 */
 
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -11,7 +14,9 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+
+import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const DBUS_NAME = 'com.corecoding.Vitals';
 const DBUS_PATH = '/com/corecoding/Vitals';
@@ -32,62 +37,141 @@ const VitalsDBusInterface = `
   </interface>
 </node>`;
 
+// Sensor category metadata matching the original extension
+const SENSOR_ICONS = {
+    'temperature': { icon: 'temperature-symbolic.svg' },
+    'voltage':     { icon: 'voltage-symbolic.svg' },
+    'fan':         { icon: 'fan-symbolic.svg' },
+    'memory':      { icon: 'memory-symbolic.svg' },
+    'processor':   { icon: 'processor-symbolic.svg', fallback: 'cpu-symbolic.svg' },
+    'system':      { icon: 'system-symbolic.svg' },
+    'network':     { icon: 'network-symbolic.svg',
+                     'icon-rx': 'network-download-symbolic.svg',
+                     'icon-tx': 'network-upload-symbolic.svg' },
+    'storage':     { icon: 'storage-symbolic.svg' },
+    'battery':     { icon: 'battery-symbolic.svg' },
+    'gpu':         { icon: 'gpu-symbolic.svg' },
+};
+
+const CATEGORY_ORDER = [
+    'temperature', 'voltage', 'fan', 'memory', 'processor',
+    'system', 'network', 'storage', 'battery',
+];
+
+const FORMAT_LABELS = {
+    'percent': '%', 'temp': '\u00b0', 'fan': ' RPM', 'in': ' V',
+    'hertz': ' Hz', 'memory': '', 'storage': '', 'speed': '/s',
+    'load': '', 'watt': ' W', 'watt-gpu': ' W',
+};
+
 let vitalsMenu = null;
 
-class VitalsMenuButton extends PanelMenu.Button {
-    static {
-        GObject.registerClass(this);
+// ---------- Custom MenuItem (icon + label + right-aligned value) ----------
+
+const VitalsMenuItem = GObject.registerClass({
+    Signals: { 'toggle': { param_types: [Clutter.Event.$gtype] } },
+}, class VitalsMenuItem extends PopupMenu.PopupBaseMenuItem {
+    _init(gicon, key, label, value, checked) {
+        super._init({ reactive: true });
+        this._checked = checked;
+        this._key = key;
+        this._gIcon = gicon;
+        this._updateOrnament();
+
+        // Icon
+        this.add_child(new St.Icon({ style_class: 'popup-menu-icon', gicon: this._gIcon }));
+
+        // Label
+        this._labelActor = new St.Label({ text: label });
+        this.add_child(this._labelActor);
+
+        // Value (right-aligned)
+        this._valueLabel = new St.Label({ text: value });
+        this._valueLabel.set_x_align(Clutter.ActorAlign.END);
+        this._valueLabel.set_x_expand(true);
+        this._valueLabel.set_y_expand(true);
+        this.add_child(this._valueLabel);
     }
 
+    get checked() { return this._checked; }
+    get key() { return this._key; }
+    get gicon() { return this._gIcon; }
+    get label() { return this._labelActor.text; }
+
+    set value(v) { this._valueLabel.text = v; }
+    get value() { return this._valueLabel.text; }
+
+    activate(event) {
+        this._checked = !this._checked;
+        this._updateOrnament();
+        this.emit('toggle', event);
+    }
+
+    _updateOrnament() {
+        this.setOrnament(this._checked
+            ? PopupMenu.Ornament.CHECK
+            : PopupMenu.Ornament.NONE);
+    }
+});
+
+// ---------- Main Panel Button ----------
+
+class VitalsMenuButton extends PanelMenu.Button {
+    static { GObject.registerClass(this); }
+
     _init(extension) {
-        super._init(0.5, 'Vitals');
+        super._init(Clutter.ActorAlign.FILL);
+
         this._extension = extension;
         this._settings = extension.getSettings();
         this._proxy = null;
         this._readings = {};
         this._textReadings = {};
+        this._sensorMenuItems = {};
+        this._hotLabels = {};
+        this._hotItems = {};
+        this._groups = {};
+        this._widths = {};
 
-        // Panel display box
-        this._panelBox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
-        this.add_child(this._panelBox);
+        this._iconPath = extension.path + '/icons/original/';
 
-        // Status label
-        this._label = new St.Label({
-            text: 'Vitals',
-            y_align: 2, // CENTER
+        // Panel layout (horizontal box with icon+value pairs)
+        this._menuLayout = new St.BoxLayout({
+            vertical: false,
+            clip_to_allocation: true,
+            x_align: Clutter.ActorAlign.START,
+            y_align: Clutter.ActorAlign.CENTER,
+            reactive: true,
+            x_expand: true,
+            style_class: 'vitals-panel-menu',
         });
-        this._panelBox.add_child(this._label);
+        this.add_child(this._menuLayout);
 
-        // Build menu
-        this._buildMenu();
-
-        // Connect to D-Bus
+        this._initializeMenu();
+        this._drawPanelItems();
         this._connectDBus();
 
         // Poll timer
-        this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
-            this._settings.get_int('update-time'),
-            () => {
-                this._refresh();
-                return GLib.SOURCE_CONTINUE;
-            });
+        let updateTime = this._settings.get_int('update-time');
+        this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, updateTime, () => {
+            this._refresh();
+            return GLib.SOURCE_CONTINUE;
+        });
     }
+
+    // ---------- D-Bus ----------
 
     _connectDBus() {
         try {
             const ProxyWrapper = Gio.DBusProxy.makeProxyWrapper(VitalsDBusInterface);
-            this._proxy = new ProxyWrapper(
-                Gio.DBus.session,
-                DBUS_NAME,
-                DBUS_PATH,
+            this._proxy = new ProxyWrapper(Gio.DBus.session, DBUS_NAME, DBUS_PATH,
                 (proxy, error) => {
                     if (error) {
                         log(`Vitals: D-Bus connection error: ${error.message}`);
                         return;
                     }
                     this._refresh();
-                }
-            );
+                });
         } catch (e) {
             log(`Vitals: Failed to connect to D-Bus: ${e.message}`);
         }
@@ -100,95 +184,431 @@ class VitalsMenuButton extends PanelMenu.Button {
             this._proxy.GetReadingsRemote((result) => {
                 if (result && result[0]) {
                     this._readings = result[0];
-                    this._updateMenu();
-                    this._updatePanel();
+                    this._updateDisplay();
                 }
             });
-
             this._proxy.GetTextReadingsRemote((result) => {
                 if (result && result[0]) {
                     this._textReadings = result[0];
-                    this._updateMenu();
+                    this._updateDisplay();
                 }
             });
-        } catch (e) {
-            // D-Bus not available yet
+        } catch (e) { /* D-Bus not available yet */ }
+    }
+
+    // ---------- Menu Structure ----------
+
+    _initializeMenu() {
+        // Create category submenus
+        for (let category of CATEGORY_ORDER) {
+            this._initializeMenuGroup(category);
+        }
+        // GPU groups (up to 4)
+        for (let i = 1; i <= 4; i++)
+            this._initializeMenuGroup('gpu#' + i, 'gpu');
+
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Bottom button row (compact round buttons, matching original)
+        let item = new PopupMenu.PopupBaseMenuItem({
+            reactive: false,
+            style_class: 'vitals-menu-button-container',
+        });
+
+        let buttonBox = new St.BoxLayout({
+            style_class: 'vitals-button-box',
+            vertical: false,
+            clip_to_allocation: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            reactive: true,
+            x_expand: true,
+        });
+
+        // Refresh
+        let refreshBtn = this._createRoundButton('view-refresh-symbolic');
+        refreshBtn.connect('clicked', () => this._refresh());
+        buttonBox.add_child(refreshBtn);
+
+        // System Monitor
+        let monitorBtn = this._createRoundButton('org.gnome.SystemMonitor-symbolic');
+        monitorBtn.connect('clicked', () => {
+            this.menu.close();
+            Util.spawn(this._settings.get_string('monitor-cmd').split(' '));
+        });
+        buttonBox.add_child(monitorBtn);
+
+        // Preferences
+        let prefsBtn = this._createRoundButton('preferences-system-symbolic');
+        prefsBtn.connect('clicked', () => {
+            this.menu.close();
+            this._extension.openPreferences();
+        });
+        buttonBox.add_child(prefsBtn);
+
+        item.add_child(buttonBox);
+        this.menu.addMenuItem(item);
+
+        // Refresh on menu open
+        this.menu.connect('open-state-changed', (_self, isOpen) => {
+            if (isOpen) this._refresh();
+        });
+    }
+
+    _initializeMenuGroup(groupName, iconCategory) {
+        let cat = iconCategory || groupName;
+        let displayName = this._ucFirst(groupName);
+        let group = new PopupMenu.PopupSubMenuMenuItem(displayName, true);
+
+        // Set category icon
+        let iconFile = this._sensorIconPath(cat);
+        if (iconFile)
+            group.icon.gicon = Gio.icon_new_for_string(iconFile);
+
+        // Status label (shows summary value, e.g. "45°C")
+        group._statusLabel = new St.Label({
+            text: '',
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'padding-left: 8px;',
+        });
+        let actor = group.actor ?? group;
+        actor.insert_child_at_index(group._statusLabel, 4);
+
+        // Hide until data arrives
+        actor.hide();
+
+        this._groups[groupName] = group;
+        this.menu.addMenuItem(group);
+    }
+
+    _createRoundButton(iconName) {
+        let button = new St.Button({
+            style_class: 'message-list-clear-button button vitals-button-action',
+        });
+        button.child = new St.Icon({ icon_name: iconName });
+        return button;
+    }
+
+    // ---------- Panel Items (hot sensors) ----------
+
+    _drawPanelItems() {
+        let hotSensors = this._settings.get_strv('hot-sensors');
+        if (hotSensors.length === 0) {
+            this._createHotItem('_default_icon_');
+        } else {
+            for (let key of hotSensors)
+                this._createHotItem(key);
         }
     }
 
-    _buildMenu() {
-        this.menu.removeAll();
+    _createHotItem(key, value) {
+        let item = new St.BoxLayout({ style_class: 'vitals-panel-item' });
+        this._hotItems[key] = item;
+        this._menuLayout.add_child(item);
 
-        // Sensor groups will be populated dynamically
-        this._menuGroups = {};
+        // Add category icon
+        if (!this._settings.get_boolean('hide-icons') || key === '_default_icon_') {
+            let icon = this._defaultIcon(key);
+            item.add_child(icon);
+        }
 
-        // Bottom separator and controls
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        if (key === '_default_icon_') return;
 
-        let controlsItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        let controlsBox = new St.BoxLayout({ style_class: 'vitals-controls' });
-
-        let refreshBtn = new St.Button({
-            child: new St.Icon({ icon_name: 'view-refresh-symbolic', style_class: 'popup-menu-icon' }),
-            style_class: 'button',
+        let label = new St.Label({
+            style_class: 'vitals-panel-label',
+            text: value || '\u2026',
+            y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
         });
-        refreshBtn.connect('clicked', () => this._refresh());
-        controlsBox.add_child(refreshBtn);
-
-        controlsItem.add_child(controlsBox);
-        this.menu.addMenuItem(controlsItem);
+        label.get_clutter_text().ellipsize = 0;
+        this._hotLabels[key] = label;
+        item.add_child(label);
     }
 
-    _updateMenu() {
-        // Group readings by category
-        let groups = {};
+    _removeHotItem(key) {
+        if (this._hotItems[key]) {
+            this._hotItems[key].destroy();
+            delete this._hotItems[key];
+        }
+        delete this._hotLabels[key];
+        delete this._widths[key];
+    }
+
+    _defaultIcon(key) {
+        let category = this._categoryFromKey(key);
+        let iconStyle = 'vitals-panel-icon-' + (category || 'default');
+        let iconPath = this._sensorIconPath(category || 'system');
+        let gicon = iconPath ? Gio.icon_new_for_string(iconPath) : null;
+
+        return new St.Icon({
+            gicon: gicon,
+            style_class: 'system-status-icon ' + iconStyle,
+        });
+    }
+
+    // ---------- Display Update ----------
+
+    _updateDisplay() {
+        // Merge numeric and text readings
+        let allReadings = {};
 
         for (let key in this._readings) {
             let [label, value, category, format] = this._readings[key];
-            if (!(category in groups)) groups[category] = [];
-            groups[category].push({ label, value: value.toString(), key });
+            allReadings[key] = { label, value: this._formatValue(value, format), rawValue: value, category, format };
         }
-
         for (let key in this._textReadings) {
             let [label, value, category, format] = this._textReadings[key];
-            if (!(category in groups)) groups[category] = [];
-            groups[category].push({ label, value, key });
+            allReadings[key] = { label, value, rawValue: value, category, format };
         }
 
-        // Update or create menu items for each group
-        for (let category in groups) {
-            if (!(category in this._menuGroups)) {
-                let subMenu = new PopupMenu.PopupSubMenuMenuItem(category, true);
-                this.menu.addMenuItem(subMenu, Object.keys(this._menuGroups).length);
-                this._menuGroups[category] = { subMenu, items: {} };
+        for (let key in allReadings) {
+            let { label, value, category, format } = allReadings[key];
+
+            // Skip group summary entries (they update the group header)
+            if (category.endsWith('-group')) {
+                let groupName = category.replace('-group', '');
+                if (this._groups[groupName]) {
+                    this._groups[groupName]._statusLabel.text = value;
+                    let actor = this._groups[groupName].actor ?? this._groups[groupName];
+                    actor.show();
+                }
+                continue;
             }
 
-            let group = this._menuGroups[category];
-            for (let reading of groups[category]) {
-                if (reading.key in group.items) {
-                    group.items[reading.key].label.text = `${reading.label}: ${reading.value}`;
-                } else {
-                    let item = new PopupMenu.PopupMenuItem(`${reading.label}: ${reading.value}`);
-                    group.subMenu.menu.addMenuItem(item);
-                    group.items[reading.key] = item;
+            // Show the group container
+            let groupName = category;
+            if (this._groups[groupName]) {
+                let actor = this._groups[groupName].actor ?? this._groups[groupName];
+                actor.show();
+            }
+
+            // Update existing menu item or create new one
+            if (this._sensorMenuItems[key]) {
+                this._sensorMenuItems[key].value = value;
+            } else {
+                this._appendMenuItem(key, label, value, category);
+            }
+
+            // Update panel hot label
+            if (this._hotLabels[key]) {
+                this._hotLabels[key].set_text(value);
+
+                if (this._settings.get_boolean('fixed-widths')) {
+                    let w = this._hotLabels[key].get_clutter_text().width;
+                    if (!this._widths[key] || w > this._widths[key]) {
+                        this._hotLabels[key].set_width(w);
+                        this._widths[key] = w;
+                    }
                 }
             }
         }
     }
 
-    _updatePanel() {
-        let hotSensors = this._settings.get_strv('hot-sensors');
-        let displayParts = [];
+    _appendMenuItem(key, label, value, category) {
+        let group = this._groups[category];
+        if (!group) return;
 
-        for (let hotKey of hotSensors) {
-            if (hotKey in this._readings) {
-                let [label, value, , format] = this._readings[hotKey];
-                displayParts.push(`${value}`);
+        let iconName = SENSOR_ICONS[category.replace(/#\d+$/, '')]?.icon || 'system-symbolic.svg';
+        let iconPath = this._extension.path + '/icons/original/' + iconName;
+        let gicon = null;
+        try { gicon = Gio.icon_new_for_string(iconPath); } catch (e) {}
+
+        let isHot = this._hotLabels[key] !== undefined;
+        let item = new VitalsMenuItem(gicon, key, label, value, isHot);
+
+        item.connect('toggle', (self) => {
+            let hotSensors = this._settings.get_strv('hot-sensors');
+            if (self.checked) {
+                hotSensors.push(self.key);
+                this._createHotItem(self.key, self.value);
+            } else {
+                hotSensors.splice(hotSensors.indexOf(self.key), 1);
+                this._removeHotItem(self.key);
             }
+            if (hotSensors.length <= 0) {
+                hotSensors.push('_default_icon_');
+                this._createHotItem('_default_icon_');
+            } else {
+                let idx = hotSensors.indexOf('_default_icon_');
+                if (idx >= 0) {
+                    hotSensors.splice(idx, 1);
+                    this._removeHotItem('_default_icon_');
+                }
+            }
+            this._settings.set_strv('hot-sensors', hotSensors.filter(
+                (item, pos, arr) => arr.indexOf(item) === pos));
+        });
+
+        // Alphabetize
+        if (this._settings.get_boolean('alphabetize')) {
+            let menuItems = group.menu._getMenuItems();
+            let pos = menuItems.length;
+            for (let i = 0; i < menuItems.length; i++) {
+                if (menuItems[i].label &&
+                    menuItems[i].label.localeCompare(label, undefined, { numeric: true, sensitivity: 'base' }) > 0) {
+                    pos = i;
+                    break;
+                }
+            }
+            group.menu.addMenuItem(item, pos);
+        } else {
+            group.menu.addMenuItem(item);
         }
 
-        this._label.text = displayParts.length > 0 ? displayParts.join(' | ') : 'Vitals';
+        this._sensorMenuItems[key] = item;
     }
+
+    // ---------- Value Formatting ----------
+
+    _formatValue(rawValue, format) {
+        let value = rawValue;
+        let unit = 1000;
+        let hp = this._settings.get_boolean('use-higher-precision');
+
+        switch (format) {
+            case 'percent':
+                value = Math.min(value * 100, 100);
+                return hp ? value.toFixed(1) + '%' : Math.round(value) + '%';
+            case 'temp': {
+                value = value / 1000;
+                let suffix = '\u00b0C';
+                if (this._settings.get_int('unit') === 1) {
+                    value = (9 / 5) * value + 32;
+                    suffix = '\u00b0F';
+                }
+                return hp ? value.toFixed(1) + suffix : Math.round(value) + suffix;
+            }
+            case 'fan':
+                return Math.round(value) + ' RPM';
+            case 'in':
+                value = value / 1000;
+                return (value >= 0 ? '+' : '') + (hp ? value.toFixed(2) : value.toFixed(1)) + ' V';
+            case 'hertz':
+                return this._scaleUnit(value, 1000, ['Hz', 'KHz', 'MHz', 'GHz', 'THz'], hp ? 2 : 1);
+            case 'memory':
+                return this._scaleMemory(value, this._settings.get_int('memory-measurement'), hp);
+            case 'storage':
+                return this._scaleStorage(value, this._settings.get_int('storage-measurement'), hp);
+            case 'speed': {
+                let bps = this._settings.get_int('network-speed-format') === 1;
+                let v = bps ? value * 8 : value;
+                let units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                let suffix = bps ? 'bps' : '/s';
+                if (v <= 0) return '0 ' + (bps ? 'bps' : 'B/s');
+                let exp = Math.floor(Math.log(v) / Math.log(1000));
+                exp = Math.min(exp, units.length - 1);
+                v = v / Math.pow(1000, exp);
+                let u = bps ? units[exp].replace('B', 'bps') : units[exp] + '/s';
+                return (hp ? v.toFixed(1) : Math.round(v)) + ' ' + u;
+            }
+            case 'uptime':
+            case 'runtime':
+                return this._formatDuration(value, format !== 'runtime' && (hp || value < 60));
+            case 'watt':
+                value = value / 1000000;
+                return (value > 0 ? '+' : '') + (hp ? value.toFixed(2) : value.toFixed(1)) + ' W';
+            case 'watt-gpu':
+                return (hp ? value.toFixed(2) : value.toFixed(1)) + ' W';
+            case 'watt-hour':
+                value = value / 1000000;
+                return (hp ? value.toFixed(2) : value.toFixed(1)) + ' Wh';
+            case 'milliamp':
+                return (hp ? (value / 1000).toFixed(1) : Math.round(value / 1000)) + ' mA';
+            case 'milliamp-hour':
+                return (hp ? (value / 1000).toFixed(1) : Math.round(value / 1000)) + ' mAh';
+            case 'load':
+                return hp ? value.toFixed(2) : value.toFixed(1);
+            default:
+                return String(value);
+        }
+    }
+
+    _scaleUnit(value, base, units, decimals) {
+        if (value <= 0) return '0 ' + units[0];
+        let exp = Math.floor(Math.log(value) / Math.log(base));
+        exp = Math.min(exp, units.length - 1);
+        let v = value / Math.pow(base, exp);
+        return v.toFixed(decimals) + ' ' + units[exp];
+    }
+
+    _scaleMemory(value, measurement, hp) {
+        let base = measurement ? 1000 : 1024;
+        let units = measurement
+            ? ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+            : ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        let v = value * base;
+        if (v <= 0) return '0 ' + units[0];
+        let exp = Math.floor(Math.log(v) / Math.log(base));
+        exp = Math.min(exp, units.length - 1);
+        v = v / Math.pow(base, exp);
+        return (hp ? v.toFixed(2) : v.toFixed(1)) + ' ' + units[exp];
+    }
+
+    _scaleStorage(value, measurement, hp) {
+        let base = measurement ? 1000 : 1024;
+        let units = measurement
+            ? ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+            : ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        if (value <= 0) return '0 ' + units[0];
+        let exp = Math.floor(Math.log(value) / Math.log(base));
+        exp = Math.min(exp, units.length - 1);
+        let v = value / Math.pow(base, exp);
+        return (hp ? v.toFixed(2) : v.toFixed(1)) + ' ' + units[exp];
+    }
+
+    _formatDuration(seconds, showSecs) {
+        let s = Math.round(Math.abs(seconds));
+        let d = Math.floor(s / 86400);
+        let h = Math.floor((s % 86400) / 3600);
+        let m = Math.floor((s % 3600) / 60);
+        let sec = s % 60;
+        let parts = [];
+        if (d > 0) parts.push(d + 'd');
+        if (h > 0) parts.push(h + 'h');
+        if (m > 0) parts.push(m + 'm');
+        if (showSecs && (sec > 0 || parts.length === 0)) parts.push(sec + 's');
+        return parts.join(' ') || '0s';
+    }
+
+    // ---------- Helpers ----------
+
+    _sensorIconPath(category, iconKey) {
+        iconKey = iconKey || 'icon';
+        let cat = category.replace(/#\d+$/, '');
+        let meta = SENSOR_ICONS[cat];
+        if (!meta) return null;
+        let filename = meta[iconKey] || meta.icon;
+        let path = this._extension.path + '/icons/original/' + filename;
+        try {
+            if (GLib.file_test(path, GLib.FileTest.EXISTS)) return path;
+        } catch (e) {}
+        // Try fallback
+        if (meta.fallback) {
+            path = this._extension.path + '/icons/original/' + meta.fallback;
+            try { if (GLib.file_test(path, GLib.FileTest.EXISTS)) return path; } catch (e) {}
+        }
+        return null;
+    }
+
+    _categoryFromKey(key) {
+        for (let cat of [...CATEGORY_ORDER, 'gpu']) {
+            if (key.includes('_' + cat + '_') || key.includes('_' + cat + '#'))
+                return cat;
+        }
+        // Check for network sub-types
+        if (key.includes('network')) return 'network';
+        return null;
+    }
+
+    _ucFirst(str) {
+        let name = str.replace(/#\d+$/, '');
+        if (name === 'gpu') return 'GPU' + str.replace('gpu', '');
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
+    // ---------- Cleanup ----------
 
     destroy() {
         if (this._timerId) {
@@ -200,10 +620,20 @@ class VitalsMenuButton extends PanelMenu.Button {
     }
 }
 
+// ---------- Extension Entry Point ----------
+
 export default class VitalsExtension extends Extension {
     enable() {
+        // Copy icons from data dir if not already present
+        let iconsDir = this.path + '/icons';
+        if (!GLib.file_test(iconsDir, GLib.FileTest.IS_DIR)) {
+            // Icons should be bundled with the extension
+            log('Vitals: icons directory not found at ' + iconsDir);
+        }
+
         vitalsMenu = new VitalsMenuButton(this);
-        Main.panel.addToStatusArea('vitalsMenu', vitalsMenu, 1, 'right');
+        let position = this._positionInPanel();
+        Main.panel.addToStatusArea('vitalsMenu', vitalsMenu, position[1], position[0]);
     }
 
     disable() {
@@ -211,5 +641,13 @@ export default class VitalsExtension extends Extension {
             vitalsMenu.destroy();
             vitalsMenu = null;
         }
+    }
+
+    _positionInPanel() {
+        let start = this.getSettings().get_int('position-in-panel');
+        let positions = ['left', 'center', 'right'];
+        let position = positions[start < positions.length ? start : 2];
+        let index = position === 'right' ? 0 : -1;
+        return [position, index];
     }
 }
