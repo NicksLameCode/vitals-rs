@@ -338,8 +338,8 @@ impl NvidiaGpuProvider {
         }
 
         // PCIe link
-        if let (Some(gen), Some(width)) = (link_gen, link_width) {
-            if !gen.is_empty() && !width.is_empty() {
+        if let (Some(r#gen), Some(width)) = (link_gen, link_width) {
+            if !r#gen.is_empty() && !width.is_empty() {
                 let pcie_str = format!("{gen}x{width}");
                 readings.push(SensorReading {
                     label: "Link Speed".to_string(),
