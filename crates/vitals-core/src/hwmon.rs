@@ -15,6 +15,9 @@ pub struct HwmonSensor {
     pub category: SensorCategory,
     pub format: SensorFormat,
     pub key: String,
+    /// Canonical device path (excluding the hwmonN component), used for stable ordering
+    /// when multiple instances of the same driver exist.
+    pub device_path: String,
 }
 
 /// Sensor type prefix mappings: (file_prefix, category, format).
@@ -42,7 +45,13 @@ pub fn discover_hwmon_sensors(
 
     for entry in entries.flatten() {
         let hwmon_dir = entry.path();
-        let hwmon_name = entry.file_name().to_string_lossy().to_string();
+
+        // Resolve the canonical device path for stable ordering across reboots.
+        // e.g., /sys/devices/pci0000:00/.../hwmon -> stable PCI/I2C topology path
+        let device_path = std::fs::canonicalize(&hwmon_dir)
+            .ok()
+            .and_then(|p| p.parent().map(|pp| pp.to_string_lossy().to_string()))
+            .unwrap_or_else(|| hwmon_dir.to_string_lossy().to_string());
 
         // Read the sensor module name
         let (sensor_name, base_path) = if let Ok(name) = read_trimmed(&hwmon_dir.join("name")) {
@@ -88,7 +97,7 @@ pub fn discover_hwmon_sensors(
                 if filename.starts_with(type_prefix) {
                     if filename.ends_with("_input") {
                         let key =
-                            format!("{}{}", hwmon_name, &filename[..filename.len() - "_input".len()]);
+                            format!("{}{}", sensor_name, &filename[..filename.len() - "_input".len()]);
                         let group = trisensors.entry(key).or_insert_with(|| SensorFileGroup {
                             category: category.clone(),
                             format,
@@ -98,7 +107,7 @@ pub fn discover_hwmon_sensors(
                         group.input = Some(base_path.join(&filename));
                     } else if filename.ends_with("_label") {
                         let key =
-                            format!("{}{}", hwmon_name, &filename[..filename.len() - "_label".len()]);
+                            format!("{}{}", sensor_name, &filename[..filename.len() - "_label".len()]);
                         let group = trisensors.entry(key).or_insert_with(|| SensorFileGroup {
                             category: category.clone(),
                             format,
@@ -168,25 +177,49 @@ pub fn discover_hwmon_sensors(
                 full_label = format!("{full_label} {count}");
             }
 
-            let sensor_key = format!(
-                "_{}_{}_{}_",
-                group.category,
-                file_key.replace('/', "_"),
-                group.format.as_str()
-            );
-
             sensors.push(HwmonSensor {
                 name: sensor_name.clone(),
                 label: full_label,
                 input_path: input_path.clone(),
                 category: group.category.clone(),
                 format: group.format,
-                key: sensor_key,
+                key: file_key.clone(),
+                device_path: device_path.clone(),
             });
         }
     }
 
+    dedup_sensor_keys(&mut sensors);
+
     sensors
+}
+
+/// Sort sensors deterministically and deduplicate keys that collide when
+/// multiple instances of the same driver exist (e.g. two `spd5118` chips).
+fn dedup_sensor_keys(sensors: &mut Vec<HwmonSensor>) {
+    // Sort by (preliminary key, device_path) so the same physical device
+    // always receives the same dedup suffix regardless of read_dir order.
+    sensors.sort_by(|a, b| a.key.cmp(&b.key).then_with(|| a.device_path.cmp(&b.device_path)));
+
+    // Append _N suffix for duplicate preliminary keys
+    let mut key_counts: HashMap<String, u32> = HashMap::new();
+    for sensor in sensors.iter_mut() {
+        let count = key_counts.entry(sensor.key.clone()).or_insert(0);
+        *count += 1;
+        if *count > 1 {
+            sensor.key = format!("{}_{}", sensor.key, count);
+        }
+    }
+
+    // Build final sensor_key from the (possibly deduped) file_key
+    for sensor in sensors.iter_mut() {
+        sensor.key = format!(
+            "_{}_{}_{}_",
+            sensor.category,
+            sensor.key.replace('/', "_"),
+            sensor.format.as_str()
+        );
+    }
 }
 
 struct SensorFileGroup {
@@ -278,5 +311,64 @@ mod tests {
     fn read_trimmed_missing_file() {
         let path = Path::new("/tmp/nonexistent_hwmon_test_file_xyz");
         assert!(read_trimmed(path).is_err());
+    }
+
+    fn make_sensor(name: &str, file_key: &str, device_path: &str) -> HwmonSensor {
+        HwmonSensor {
+            name: name.into(),
+            label: format!("{name} temp"),
+            input_path: PathBuf::from(format!("{device_path}/temp1_input")),
+            category: SensorCategory::Temperature,
+            format: SensorFormat::Temp,
+            key: file_key.into(),
+            device_path: device_path.into(),
+        }
+    }
+
+    #[test]
+    fn dedup_single_driver_no_suffix() {
+        let mut sensors = vec![make_sensor("coretemp", "coretemptemp1", "/sys/devices/pci/hwmon")];
+        dedup_sensor_keys(&mut sensors);
+        assert_eq!(sensors[0].key, "_temperature_coretemptemp1_temp_");
+    }
+
+    #[test]
+    fn dedup_different_drivers_no_suffix() {
+        let mut sensors = vec![
+            make_sensor("coretemp", "coretemptemp1", "/sys/devices/pci-a/hwmon"),
+            make_sensor("acpitz", "acpitztemp1", "/sys/devices/pci-b/hwmon"),
+        ];
+        dedup_sensor_keys(&mut sensors);
+        assert!(sensors.iter().any(|s| s.key == "_temperature_coretemptemp1_temp_"));
+        assert!(sensors.iter().any(|s| s.key == "_temperature_acpitztemp1_temp_"));
+    }
+
+    #[test]
+    fn dedup_duplicate_drivers_get_suffix() {
+        let mut sensors = vec![
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0050/hwmon"),
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0051/hwmon"),
+        ];
+        dedup_sensor_keys(&mut sensors);
+        assert_eq!(sensors[0].key, "_temperature_spd5118temp1_temp_");
+        assert_eq!(sensors[1].key, "_temperature_spd5118temp1_2_temp_");
+    }
+
+    #[test]
+    fn dedup_stable_regardless_of_input_order() {
+        let mut sensors_a = vec![
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0050/hwmon"),
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0051/hwmon"),
+        ];
+        let mut sensors_b = vec![
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0051/hwmon"),
+            make_sensor("spd5118", "spd5118temp1", "/sys/devices/i2c/17-0050/hwmon"),
+        ];
+        dedup_sensor_keys(&mut sensors_a);
+        dedup_sensor_keys(&mut sensors_b);
+
+        let keys_a: Vec<_> = sensors_a.iter().map(|s| s.key.as_str()).collect();
+        let keys_b: Vec<_> = sensors_b.iter().map(|s| s.key.as_str()).collect();
+        assert_eq!(keys_a, keys_b);
     }
 }

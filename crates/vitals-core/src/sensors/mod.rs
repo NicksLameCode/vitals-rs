@@ -138,7 +138,7 @@ pub struct SensorReading {
     pub value: SensorValue,
     pub category: SensorCategory,
     pub format: SensorFormat,
-    /// Unique key for this reading (e.g., "_temperature_hwmon3temp1_").
+    /// Unique key for this reading (e.g., "_temperature_coretemptemp1_temp_").
     pub key: String,
 }
 
