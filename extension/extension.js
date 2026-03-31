@@ -486,17 +486,22 @@ class VitalsMenuButton extends PanelMenu.Button {
 
         this._hideGraphPopout();
 
+        // Generation counter to discard stale D-Bus callbacks after hover-out
+        this._graphGeneration = (this._graphGeneration || 0) + 1;
+        let gen = this._graphGeneration;
+
         this._proxy.GetTimeSeriesRemote(key, (result) => {
+            if (gen !== this._graphGeneration)
+                return;
             if (!result || !result[0] || result[0].length === 0)
                 return;
 
             let points = result[0]; // array of [timestamp, value] pairs
 
-            // Downsample/bucket into GRAPH_BAR_COUNT bars
-            let values = points.map(p => p.deep_unpack ? p.deep_unpack() : p);
-            let rawVals = values.map(v => {
-                let inner = Array.isArray(v) ? v : [v[0], v[1]];
-                return inner[1];
+            // Extract numeric values from GVariant tuples
+            let rawVals = points.map(p => {
+                let v = p.deep_unpack ? p.deep_unpack() : p;
+                return Array.isArray(v) ? v[1] : v;
             });
 
             // Apply format-specific scaling for display
@@ -621,19 +626,22 @@ class VitalsMenuButton extends PanelMenu.Button {
             xWrap.add_child(xRow);
             popout.add_child(xWrap);
 
-            // Position popout to the left of the menu
+            // Position popout to the left of the menu.
+            // Compute width from constants since the widget isn't laid out yet.
+            let popoutWidth = GRAPH_BAR_COUNT * GRAPH_BAR_WIDTH + 80; // bars + y-axis + padding
             let menuActor = this.menu.actor ?? this.menu;
-            let [menuX, menuY] = menuActor.get_transformed_position();
-            let [itemX, itemY] = menuItem.get_transformed_position();
+            let [menuX] = menuActor.get_transformed_position();
+            let [, itemY] = menuItem.get_transformed_position();
 
-            Main.layoutManager.addChrome(popout);
-            popout.set_position(Math.max(0, Math.round(menuX - popout.width - 6)),
-                                Math.round(itemY));
             this._graphPopout = popout;
+            Main.layoutManager.addChrome(popout);
+            popout.set_position(Math.max(0, Math.round(menuX - popoutWidth - 6)),
+                                Math.round(itemY));
         });
     }
 
     _hideGraphPopout() {
+        this._graphGeneration = (this._graphGeneration || 0) + 1;
         if (this._graphPopout) {
             Main.layoutManager.removeChrome(this._graphPopout);
             this._graphPopout.destroy();
